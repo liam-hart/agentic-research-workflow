@@ -1,0 +1,4 @@
+interface:
+  display_name: "Learn Style"
+  short_description: "Learn rules from the researcher-approved revisions"
+  default_prompt: "Use $learn-style to compare my approved revision with the original draft and propose a reusable style rule."

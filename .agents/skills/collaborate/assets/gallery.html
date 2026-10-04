@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="icon" href="data:,">
+<style>
+/*__COMMON_CSS__*/
+.filters { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+.filters button { text-transform: capitalize; }
+.filters button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .75rem; display: grid; gap: .5rem; align-content: start; }
+.item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--bg); border-radius: 6px; cursor: zoom-in; }
+.item h3 { margin: 0; font-size: 1rem; }
+.item dl { display: grid; grid-template-columns: auto 1fr; gap: 0 .75rem; margin: 0; font-size: .85rem; color: var(--muted); }
+.item dd { margin: 0; }
+.verdicts { display: flex; gap: .35rem; }
+.verdicts button { flex: 1; text-transform: capitalize; }
+.verdicts button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.verdicts button[data-verdict="keep"][aria-pressed="true"] { background: var(--good); border-color: var(--good); }
+.verdicts button[data-verdict="maybe"][aria-pressed="true"] { background: var(--warn); border-color: var(--warn); }
+.verdicts button[data-verdict="reject"][aria-pressed="true"] { background: var(--bad); border-color: var(--bad); }
+.question { display: grid; gap: .2rem; font-size: .9rem; }
+dialog { border: none; border-radius: 10px; padding: .75rem; background: var(--surface); color: var(--text); max-width: 95vw; }
+dialog img { max-width: 90vw; max-height: 80vh; display: block; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<dialog id="zoom"></dialog>
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+/*__COMMON_JS__*/
+
+const state = loadState();
+state.answers = state.answers || {};
+let filter = "all";
+
+function answerFor(id) {
+  if (!state.answers[id]) state.answers[id] = { verdict: null, note: "", answers: {} };
+  return state.answers[id];
+}
+
+function applyFilter() {
+  for (const card of document.querySelectorAll(".item")) {
+    const verdict = card.dataset.verdict;
+    card.hidden = !(filter === "all" || (filter === "unreviewed" ? !verdict : verdict === filter));
+  }
+}
+
+const zoomDialog = document.getElementById("zoom");
+zoomDialog.addEventListener("click", () => zoomDialog.close());
+function zoom(item) {
+  zoomDialog.replaceChildren(el("img", { src: item.image, alt: item.label }), el("p", { text: item.label }));
+  zoomDialog.showModal();
+}
+
+function questionInput(question, answer) {
+  const current = answer.answers[question.id] || "";
+  const input = question.choices
+    ? el("select", {}, el("option", { value: "", text: "—" }),
+        question.choices.map((choice) => el("option", { value: choice, text: choice, selected: choice === current })))
+    : el("input", { type: "text" });
+  if (!question.choices) input.value = current;
+  input.addEventListener(question.choices ? "change" : "input", () => {
+    answer.answers[question.id] = input.value;
+    saveState(state);
+  });
+  return el("label", { class: "question" }, question.prompt, input);
+}
+
+function renderItem(item, refresh) {
+  const answer = answerFor(item.id);
+  const card = el("article", { class: "item" });
+  const buttons = SPEC.verdicts.map((verdict) => el("button", {
+    type: "button",
+    "data-verdict": verdict,
+    onclick: () => {
+      answer.verdict = answer.verdict === verdict ? null : verdict;
+      saveState(state);
+      sync();
+      refresh();
+      applyFilter();
+    },
+  }, verdict));
+  function sync() {
+    card.dataset.verdict = answer.verdict || "";
+    for (const button of buttons) {
+      button.setAttribute("aria-pressed", String(button.dataset.verdict === answer.verdict));
+    }
+  }
+  const meta = item.meta
+    ? el("dl", {}, Object.entries(item.meta).map(([key, value]) => [el("dt", { text: key }), el("dd", { text: String(value) })]))
+    : null;
+  const note = el("textarea", { rows: 2, placeholder: "Note (optional)" });
+  note.value = answer.note;
+  note.addEventListener("input", () => {
+    answer.note = note.value;
+    saveState(state);
+  });
+  const children = [
+    el("img", { src: item.image, alt: item.label, loading: "lazy", onclick: () => zoom(item) }),
+    el("h3", { text: item.label }),
+    meta,
+    el("div", { class: "verdicts" }, buttons),
+    ...(SPEC.questions || []).map((question) => questionInput(question, answer)),
+    note,
+  ];
+  card.append(...children.filter(Boolean));
+  sync();
+  return card;
+}
+
+mountHeader();
+const refresh = mountToolbar(state, {
+  progress: (s) => [SPEC.items.filter((item) => s.answers[item.id]?.verdict).length, SPEC.items.length],
+  summary: (s) => {
+    const lines = SPEC.verdicts.map((verdict) => {
+      const labels = SPEC.items.filter((item) => s.answers[item.id]?.verdict === verdict).map((item) => item.label);
+      return `- **${verdict}** (${labels.length}): ${labels.join(", ") || "none"}`;
+    });
+    const open = SPEC.items.filter((item) => !s.answers[item.id]?.verdict).length;
+    if (open) lines.push(`- **unreviewed** (${open})`);
+    for (const item of SPEC.items) {
+      const answer = s.answers[item.id];
+      if (!answer) continue;
+      const extras = Object.entries(answer.answers || {}).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`);
+      if (answer.note) extras.push(answer.note);
+      if (extras.length) lines.push(`- ${item.label}: ${extras.join("; ")}`);
+    }
+    return lines;
+  },
+});
+const filters = ["all", "unreviewed", ...SPEC.verdicts].map((name) => el("button", {
+  type: "button",
+  "aria-pressed": String(name === filter),
+  onclick: (event) => {
+    filter = name;
+    for (const button of filters) button.setAttribute("aria-pressed", String(button === event.currentTarget));
+    applyFilter();
+  },
+}, name));
+document.getElementById("app").append(
+  el("div", { class: "filters" }, filters),
+  el("div", { class: "grid" }, SPEC.items.map((item) => renderItem(item, refresh))));
+applyFilter();
+</script>
+</body>
+</html>

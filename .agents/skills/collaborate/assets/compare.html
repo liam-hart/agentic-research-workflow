@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="icon" href="data:,">
+<style>
+/*__COMMON_CSS__*/
+.decision { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+.decision h2 { font-size: 1.2rem; margin: 0 0 .4rem; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .75rem; margin: .75rem 0; }
+.option { border: 1px solid var(--border); border-radius: 8px; padding: .75rem; }
+.option.recommended { border-color: var(--accent); }
+.option:has(input:checked) { background: var(--accent-soft); }
+.option-head { display: flex; gap: .5rem; align-items: center; cursor: pointer; }
+.option p { margin: .4rem 0; }
+.tradeoffs { color: var(--muted); }
+.badge { margin-left: auto; font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: var(--accent); color: var(--bg); }
+.preview { max-width: 100%; overflow-x: auto; background: var(--bg); border-radius: 6px; padding: .5rem; font-size: .85rem; }
+.other { display: block; margin: .5rem 0; cursor: pointer; }
+.recommendation { border-left: 3px solid var(--accent); padding-left: .6rem; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+/*__COMMON_JS__*/
+
+const OTHER = "_other";
+const state = loadState();
+state.answers = state.answers || {};
+
+function answerFor(id) {
+  if (!state.answers[id]) state.answers[id] = { choice: null, note: "" };
+  return state.answers[id];
+}
+
+function depth(label, text) {
+  return text ? el("details", {}, el("summary", { text: label }), el("p", { text })) : null;
+}
+
+function preview(spec) {
+  if (!spec) return null;
+  if (spec.kind === "svg") return el("img", { class: "preview", src: spec.src, alt: "Diagram" });
+  return el("pre", { class: "preview" }, el("code", { text: spec.text }));
+}
+
+function radio(decisionId, value, answer, refresh) {
+  const input = el("input", { type: "radio", name: `choice-${decisionId}`, value, checked: answer.choice === value });
+  input.addEventListener("change", () => {
+    answer.choice = value;
+    saveState(state);
+    refresh();
+  });
+  return input;
+}
+
+function renderDecision(decision, refresh) {
+  const answer = answerFor(decision.id);
+  const options = decision.options.map((option) => {
+    const recommended = decision.recommendation.option === option.id;
+    return el("div", { class: recommended ? "option recommended" : "option" },
+      el("label", { class: "option-head" },
+        radio(decision.id, option.id, answer, refresh),
+        el("strong", { text: option.label }),
+        recommended ? el("span", { class: "badge", text: "Recommended" }) : null),
+      el("p", { text: option.summary }),
+      el("p", { class: "tradeoffs" }, el("em", { text: "Trade-off: " }), option.tradeoffs),
+      depth("What goes wrong", option.what_goes_wrong),
+      preview(option.preview));
+  });
+  const note = el("textarea", { rows: 2, placeholder: "Why, conditions, or a hybrid (optional)" });
+  note.value = answer.note;
+  note.addEventListener("input", () => {
+    answer.note = note.value;
+    saveState(state);
+  });
+  return el("section", { class: "decision" },
+    el("h2", { text: decision.question }),
+    decision.concept ? el("p", { class: "concept" }, "Concept: ", el("strong", { text: decision.concept })) : null,
+    decision.context ? el("p", { text: decision.context }) : null,
+    depth("Why this matters", decision.why_it_matters),
+    depth("What most teams do", decision.what_teams_do),
+    el("div", { class: "options" }, options),
+    el("label", { class: "other" }, radio(decision.id, OTHER, answer, refresh), " Something else (explain in the note)"),
+    el("p", { class: "recommendation" }, el("strong", { text: "Recommendation: " }), decision.recommendation.reason),
+    note);
+}
+
+mountHeader();
+const refresh = mountToolbar(state, {
+  progress: (s) => [SPEC.decisions.filter((d) => s.answers[d.id]?.choice).length, SPEC.decisions.length],
+  summary: (s) => SPEC.decisions.map((d) => {
+    const answer = s.answers[d.id] || {};
+    const option = d.options.find((o) => o.id === answer.choice);
+    const label = answer.choice === OTHER ? "Something else" : option ? option.label : "(unanswered)";
+    return `- **${d.question}** → ${label}${answer.note ? ` (${answer.note})` : ""}`;
+  }),
+});
+const app = document.getElementById("app");
+for (const decision of SPEC.decisions) app.append(renderDecision(decision, refresh));
+</script>
+</body>
+</html>

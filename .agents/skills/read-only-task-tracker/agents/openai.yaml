@@ -1,0 +1,4 @@
+interface:
+  display_name: "Read-Only Task Tracker"
+  short_description: "Track vault tasks without implementing them"
+  default_prompt: "Use $read-only-task-tracker to inspect current task state and report prioritized remaining work without modifying task artifacts."

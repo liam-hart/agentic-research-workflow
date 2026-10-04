@@ -1,0 +1,24 @@
+name: privacy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python3 -m unittest discover -s tools -p "test_*.py"
+      - name: Skill list is current
+        run: python3 tools/list_skills.py --check
+      - name: Privacy check
+        run: python3 tools/privacy_check.py

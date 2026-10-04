@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Closeout"
+  short_description: "Reconcile research work and validation"
+  default_prompt: "Close out this completed implementation using the live authorities and one handoff."
