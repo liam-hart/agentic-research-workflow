@@ -21,7 +21,7 @@ Do not use Word's built-in Heading 1/2/3 paragraph styles. They pull template fo
 
 **The researcher's one deviation from strict APA:** single line spacing throughout, not APA's standard double spacing. Everything else about APA structure (margins, font consistency between headings and body, title-case rules) still applies unless the researcher specifies otherwise for a given document.
 
-**Body font:** Times New Roman 12pt unless the document specifies otherwise. A lab-facing export through `operations/scripts/export-clean-docx.py` (the `vault-onedrive` skill) keeps that script's declared font; this skill does not override it.
+**Body font:** Times New Roman 12pt unless the document specifies otherwise. A lab-facing export through `operations/scripts/export-clean-docx.py` (the `vault-export` skill) keeps that script's declared font; this skill does not override it.
 
 ## Implementation (docx via docx-js)
 
