@@ -60,6 +60,7 @@ When drafting for a masked-review journal: remind the researcher that masked rev
 ## 6. Output
 
 - Produce the polished letter(s) ready to paste.
+- When a PDF is wanted, typeset the response document with `operations/templates/response-doc.typ` and a cover letter with `grant-letter` from `operations/templates/grant-doc.typ`. Vendor both files into the manuscript repository. A format the journal requires takes precedence.
 - Append a short **"Source basis"** note listing exactly which curated files (from §2) were used for this draft.
 - Save only when requested. Use the manuscript project's documented submission-artifact authority; if no destination is documented, ask rather than treating a journal cover letter or response document as ordinary outgoing email. Your message-drafts folder is only for actual email/message drafts.
 
