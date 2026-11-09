@@ -1,6 +1,6 @@
 ---
 name: presentations
-description: "Draft native Touying (Typst) research presentations from a user-approved narrative arc using assertion-evidence headlines, sparse audience-facing copy, and a paired companion explainer when needed. Use when creating research talks, journal clubs, and synthesis decks; use a document skill for PowerPoint or native Google Slides artifacts."
+description: "Draft native Touying (Typst) research presentations from a user-approved narrative arc using assertion-evidence headlines, sparse audience-facing copy, and per-slide script comments. Use when creating research talks, journal clubs, and synthesis decks; use a document skill for PowerPoint or native Google Slides artifacts."
 ---
 
 # Presentations
@@ -9,13 +9,20 @@ Produce a native Touying research deck, built from literature, project material,
 
 ## 1. Select the Touying template
 
-- `operations/templates/Touying Presentation - Research Talk.typ` — one assertion and one primary item of evidence per slide.
-- `operations/templates/Touying Presentation - Journal Club.typ` — one-paper background, question, methods, results, interpretation, and critique.
-- `operations/templates/Touying Presentation - Synthesis.typ` — a multi-paper lineage that lands on a gap, proposal, or critical test.
-- `operations/templates/Touying Presentation - Conference Talk.typ` — 12–15 minutes of results: the full hypothesis spine, weighted toward figures, closing on one contribution.
-- `operations/templates/Touying Presentation - Lightning Talk.typ` — 5 minutes, 4–6 slides: one hypothesis, one key result, a take-home with contact.
-- `operations/templates/Touying Presentation - Prelim Talk.typ` — prelim or committee: a framework, an aims overview, a hypothesis map per aim, a timeline, and committee questions.
-- `operations/templates/Touying Presentation - Lab Update.typ` — lab-meeting progress: status, one result or demo, the next milestone, and asks. No spine.
+Templates live in `operations/templates/` as `Touying Presentation - <Type>.typ`:
+
+| Type | Use for |
+|---|---|
+| Research Talk | One assertion and one primary item of evidence per slide |
+| Journal Club | One paper, background through critique |
+| Synthesis | A multi-paper lineage landing on a gap, proposal, or critical test |
+| Conference Talk | 12–15 minutes of results on the full hypothesis spine |
+| Lightning Talk | 5 minutes, 4–6 slides, one hypothesis and one result |
+| Prelim Talk | Prelim or committee: framework, aims, a map per aim, timeline |
+| Lab Update | 5–10-minute lab check-in; no spine (lab-internal) |
+| Lab Meeting | Full lab slot on one project: recap, changes, open problems (lab-internal) |
+
+**Lab-internal talks** (Lab Update, Lab Meeting) skip the acknowledgements slide, may take a casual title, use a lighter spine with `section-tag` footers, and may headline an open-problem slide with a genuine question. External talks keep every rule below. Read [references/deck-templates.md](references/deck-templates.md) for each template's full shape and the exact exemptions.
 
 All of them import `operations/templates/deck-kit.typ`, the shared slide geometry, helpers, and layouts promoted from a delivered talk deck. The CeTZ figure pieces live in `operations/templates/deck-figures.typ`, which a deck imports only when it needs them. Change shared layout there, never by copying a divergent helper into one deck. `operations/templates/Touying Gallery.typ` renders every layout and figure piece on its own slide: open its PDF as the visual menu when drafting.
 
@@ -38,6 +45,8 @@ Do not generate slides immediately. Follow a two-phase workflow:
 
 The researcher's rules. However short the talk, it tells a story with five elements: background and motivation, the questions or objectives, the challenges overcome, the data behind the findings, and conclusions or next steps.
 
+**Agents never estimate timing.** Do not estimate speaking time or minutes per section, ask time-budget questions, or cut or park content for time. The researcher manages timing. The table below applies only when the researcher gives a speaking time and asks for a slide budget.
+
 Budget by **speaking time**, not slot length. A 30-minute seminar slot with 15–20 minutes of discussion is a 10–15-minute talk. The 5- and 10-minute rows are the researcher's. The longer rows extend the same pattern: about one slide per speaking minute, background about a fifth of the talk, one questions slide, data and discussion about three fifths, then the conclusion. The upper bound is a cap, not a target. More than about one slide per speaking minute risks running out of time before the closing slides.
 
 | Speaking time | Slides, no more | Background | Questions / hypotheses | Data + discussion | Conclusion |
@@ -59,7 +68,7 @@ Budget by **speaking time**, not slot length. A 30-minute seminar slot with 15�
 
 If the hypotheses first appear late, after the methods, the methods are heard without knowing what they test.
 
-**Fixed opening.** Title → **acknowledgements** → 1–2 motivation slides → theoretical tension → hypothesis map. Acknowledgements always follow the title so they cannot be skipped for time. The map lands within the first ~20% of the talk.
+**Fixed opening.** Title → **acknowledgements** → 1–2 motivation slides → theoretical tension → hypothesis map. Acknowledgements always follow the title so they cannot be skipped for time. The map lands within the first ~20% of the talk. Lab-internal talks skip the acknowledgements and use the lighter spine (§ 1).
 
 **The spine.** The hypothesis map is the talk's recurring anchor, built with the kit's `hypothesis-map(HYPOTHESES, question: ..)` so every appearance is identical:
 
@@ -77,13 +86,13 @@ Emphasis on the map is contrast tier and weight, never accent colour: accents st
 1. After approval, draft native Touying `.typ` slides from the matching template.
 2. Save the canonical deck in `resources/presentations/` or the relevant project presentation folder. Generated PDFs belong in `resources/presentations/exports/`.
 3. Apply the `academic-writing` skill's current prose and title guidance. This skill owns slide architecture, narrative sequencing, and density.
-4. Put only audience-facing material on slides. Short delivery cues may go in `#speaker-note[..]` (§ 5); extended explanation belongs in the companion document.
+4. Put only audience-facing material on slides. Short delivery cues go in `#speaker-note[..]`; the script and context go in the slide's `// SCRIPT:` comment (§ 5). Never put decision-log, issue, or study-log IDs (`D-123`, `#612`, `S-045`) in audience-facing text; they belong in comments only.
 5. Use descriptive relative asset paths and preserve source provenance in comments without turning those comments into presenter notes.
 
 ## 3. Assertion-evidence contract
 
 - Each substantive slide headline is a complete declarative sentence stating the takeaway. Use a neutral descriptive sentence when the evidence does not support a stronger claim.
-- Do not use rhetorical questions, teasers, colloquial titles, em-dash punchlines, self-congratulation, or stock AI phrasing.
+- Do not use rhetorical questions, teasers, colloquial titles, em-dash punchlines, self-congratulation, or stock AI phrasing. The one exception is an open-problem slide in a lab-internal talk, which may ask the genuine question (§ 1).
 - Keep a headline concise enough to remain on one line when practical (about 10–12 words or 80 characters).
 - Keep audience-facing explanatory copy below 20 words per slide whenever the evidence can carry the argument. Labels, citations, table cells, and axis text do not count toward that budget.
 - Prefer one primary chart, diagram, image, comparison, or formal table over bullet-heavy prose.
@@ -95,48 +104,18 @@ A recurring set of stock visual habits makes a deck read as marketing collateral
 than as academic evidence. Your slide linter (for example `operations/scripts/slide_lint.py`) should fail closed on them; a deck
 that trips it does not ship.
 
-### Banned outright
+- **Banned outright:** eyebrow or kicker headers (no `label-head`-style helper, ever),
+  `upper()` or all-caps, `tracking:` letterspacing, emoji, and hardcoded hex in a deck.
+- **Constrained:** a border needs a real containment job and takes a `0.5pt`
+  `P.border-element` hairline, never an accent. Accent colour encodes only an empirical
+  condition, hypothesis, or factor the audience tracks, always doubled by a text label; it
+  never tags furniture or varies hue per panel. Unboxed panels are the default; a card is
+  one archetype slot.
+- **Hierarchy:** rank by size, weight, and position; colour encodes, it does not rank. A
+  panel heading is never smaller than body copy.
 
-| Pattern | Why it fails here |
-|---|---|
-| **Eyebrow / kicker headers** — small, all-caps, letterspaced, accent-coloured micro-text above a title or column | A SaaS landing-page device. It adds a perceptual element (Naegle Rule 4) that carries no spoken beat, and it puts the *least* important text in the *most* saturated colour. No `label-head`-style helper, ever. |
-| **`upper()` / all-caps** for labels or body | Capitals slow reading by removing word-shape cues; Naegle Rule 7 names ALL CAPS explicitly. Sentence case, or title case for a proper noun. |
-| **`tracking:` letterspacing** | Decoration with no semantic job. |
-| **Emoji** | Not an academic register, and it renders unpredictably. |
-| **Hardcoded hex in a deck** | Bypasses the contrast contract. Every colour resolves through `theme-colors.typ`. |
-
-### Constrained, not banned
-
-- **Borders.** A stroked box must have a real containment job — an image well, a nested
-  table, a quoted definition. Grouping by whitespace, grid gutter, and alignment is the
-  default; a border is what you reach for when whitespace has already failed. When a box is
-  warranted, it takes a `0.5pt` hairline at `P.border-element`, not an accent.
-- **Accent colour.** `P.accent.*` encodes an empirical condition, hypothesis, or
-  experimental factor the audience must track across slides — condition A versus condition B,
-  one model against its alternative. It does not tag generic furniture ("Where this goes
-  next", "Open question", "Our study"), and it never assigns a different hue per panel to
-  make a grid look varied. Rainbow category tagging teaches the audience that colour means
-  nothing, which spends the one channel that should have meant something. Every accent
-  encoding is doubled by a text label, per § 4a.
-- **Cards.** Unboxed panels are the default. A `card`/`container` is one archetype slot,
-  not the wrapper for every thought on the slide. Three bordered boxes in a row is a grid
-  with extra ink.
-
-### Typographic hierarchy
-
-Rank by size, weight, and position. Colour is not a hierarchy device; it is an encoding
-device.
-
-| Role | Size | Weight | Token |
-|---|---|---|---|
-| Slide headline | 1.1em (set by the `heading.where(level: 2)` rule) | bold | `P.text-headline` |
-| Panel / column heading | **≥ 1em** — body size or larger, never smaller | bold | `P.text-headline` |
-| Body copy | ≤ 0.85em | regular | `P.text-primary` |
-| Caption, qualifier, citation | ~0.7em | regular | `P.text-secondary` |
-| Condition label (accent-carrying) | matches its neighbour's tier | bold | `P.accent.<hue>.emphasis` |
-
-A subheading reads as a subheading because of weight and position. If it needs capitals,
-letterspacing, and colour to be legible as a heading, it is too small.
+Read [references/typographic-anti-patterns.md](references/typographic-anti-patterns.md)
+for the rationale behind each ban and the size/weight/token table for every text role.
 
 ## 3b. Slide archetype catalog
 
@@ -162,8 +141,7 @@ headline, the figure, or the narration:
 - a caveat that changes how the slide should be read
 
 If a line works as something the presenter would say aloud (a transition, a restatement
-of the headline, a summary, a motivational sentence), it belongs in the companion
-explainer's spoken narrative, not on the slide. If nothing qualifies, leave the band empty.
+of the headline, a summary, a motivational sentence), it belongs in the slide's `// SCRIPT:` comment, not on the slide. If nothing qualifies, leave the band empty.
 
 | Keep | Cut (move to narration) |
 |---|---|
@@ -175,7 +153,7 @@ The helper is `context-line(body)`.
 
 ## 3c. Deck and talk titles
 
-The researcher's approved preferences. The deck title is also the title submitted to seminar organizers, so the same rules apply to both.
+The researcher's approved preferences. The deck title is also the title submitted to seminar organizers, so the same rules apply to both. A lab-internal talk (§ 1) may instead use a casual title in the presenter's own words.
 
 - **One title, no subtitle.** Never add a colon-split title or a subtitle line unless a venue explicitly requires one. Agents overuse subtitles; do not propose them in brainstorms either.
 - **Approved styles:**
@@ -198,28 +176,28 @@ Use Typst primitives directly; do not recreate HTML/CSS layout conventions.
 - Use relative paths with `image(...)`; never use Obsidian embeds or raw HTML in a `.typ` deck.
 - Keep deck-specific helpers small and local. Shared helpers live in `operations/templates/deck-kit.typ`; propose an addition there before copying a helper across decks.
 
-Pin the deck import to `@preview/touying:0.8.0`. The supported compiler baseline is Typst 0.15.1. An older delivered deck may stay pinned to its original Touying version as a historical record.
-
-Touying 0.8.0 features in use:
-
-- **Handout export.** `--input export-mode=handout` collapses every animation to its final state, one page per slide. It is the version to share after a talk. `export_deck.py` (§ 6) writes it alongside the presentation PDF.
-- **Speaker notes for Pympress.** `#speaker-note[..]` is invisible on the slide. `--input notes=pympress` (which `deck-kit.typ` reads) draws each slide's notes on the right half of a doubled page, the layout the Pympress presenter app splits between laptop and projector. See § 5 for what belongs in a note.
-- **Parked slides.** Label a heading `<touying:never>` to keep a cut or draft slide out of every export without commenting out its markup. Backup slides after the discussion stay live.
-- **Overflow is not a compiler signal.** With Touying 0.8.0 and Typst 0.15.1, a body taller than the slide silently continues onto extra pages, a box wider than the slide is silently clipped at the page edge, and an over-long `#speaker-note` is silently clipped on the Pympress page. All three compile with exit 0 and no warning, so neither the compile step nor `export_deck.py` catches them. Only the rendered-PDF inspection in § 6 does.
-
-Not adopted: article mode (it linearizes the deck into a rough A4 document; the companion explainer stays the prose surface), and the new animation entry points (`animate`, `touying-render`, element-level `touying-recall`), which solve nothing current. The hypothesis map uses a kit function rather than `touying-recall` because each recall changes its focus.
+Pin the deck import to `@preview/touying:0.8.0` (compiler baseline Typst 0.15.1). Touying features in use: handout export (`--input export-mode=handout`), Pympress speaker notes (`--input notes=pympress`), and parked slides labelled `<touying:never>`. **Overflow is not a compiler signal:** an over-tall body spills onto extra pages, an over-wide box is clipped, and an over-long note is clipped, all with exit 0; only the rendered inspection in § 6 catches them. Read [references/typst-touying-reference.md](references/typst-touying-reference.md) for feature mechanics and features not adopted.
 
 ## 4a. Colour authority
 
-Every deck draws colour from `operations/templates/theme-colors.typ`, a contrast-first token set generated as a function of background and a target WCAG 2.1 ratio, not chosen by hand. `deck-kit.typ` imports it and exposes `THEME` and the palette `P`; decks compile with `--root .` and switch to a dark room with `--input theme=dark`, which re-solves every token against the dark canvas. Each token sits at a fixed tier: `surface-subtle` ≥ 1.1:1, `border-element` ≥ 3:1, `text-secondary` ≥ 4.5:1, `text-primary` ≥ 7:1, `text-headline` ≥ 10.5:1, with accent hues (`blue teal orange purple red`) supplied at matched 3:1 / 4.5:1 / 7:1 variants. Headlines use `text-headline` so the assertion survives degraded projection and reduced audience contrast sensitivity. Categorical data marks use the Okabe–Ito set (`cat`) verbatim; any mark in `cat-needs-outline-on-light` carries a 0.75pt `text-primary` outline, and every categorical encoding is doubled by a non-colour channel — marker shape, dash pattern, or a direct label. Regenerate tokens with your palette generator script; never hand-edit a hex.
+Every colour comes from `operations/templates/theme-colors.typ` through the `P` palette that `deck-kit.typ` exposes; never hardcode or hand-edit a hex, and regenerate tokens with your palette generator script. Headlines use `P.text-headline`. Categorical marks use the Okabe–Ito `cat` set, outline any mark in `cat-needs-outline-on-light`, and double every colour encoding with shape, dash, or a direct label. Compile with `--root .`; `--input theme=dark` re-solves every token for a dark room. The token tiers and WCAG 2.1 ratios are in [references/typst-touying-reference.md](references/typst-touying-reference.md) § Colour tokens.
 
-## 5. Companion explainer
+## 4b. Video and animation
 
-A synthesis or method-narrative deck pairs with a Markdown explainer that mirrors the deck section by section. The deck comment header records `companion: "[[... — Explainer]]"`; the explainer frontmatter records `deck: "[[...]]"`. Research talks and journal clubs may also use companions when the slide density contract would otherwise be violated.
+A PDF cannot reliably play motion, so choose by how much of the talk moves:
 
-The companion is presenter-facing by design and may contain delivery notes, elaboration, source verification, and native Obsidian callouts that do not belong on slides.
+- **Tier 1, the default (1–3 clips):** `linked-still` (§ 3b): the still is the slide and handout, a click opens the clip. A `repeat:` flipbook covers a short animation that must survive any viewer.
+- **Tier 2, high-stakes talks needing in-slide loops:** `export_deck.py --keynote`, authored exactly as Tier 1.
+- **Tier 3, video-dominated talks:** Quarto Reveal.js, which leaves the Touying contract; agree on it with the researcher first.
 
-**Speaker notes versus companion.** The companion holds the full spoken narrative and is where narration is drafted and reviewed. `#speaker-note[..]` holds only the short cue the researcher needs to glance at mid-talk in Pympress (a name to thank, a time check, the one point a slide must land, the hypothesis to name aloud). Keep each note to a line or two; never paste companion narration into a note.
+`local:` clip links break on a podium computer: present from your own laptop, with the clips on a USB stick as the fallback. Read [references/video-and-animation.md](references/video-and-animation.md) before adding any clip (player limits, QuickTime and Keynote mechanics, Tier 2 failure modes).
+
+## 5. Script comments and speaker notes
+
+Separate companion explainers are retired: a companion drifts out of date the moment the deck changes. The script now lives with its slide, in two channels:
+
+- **`// SCRIPT:` comment block** directly above each slide's `==` heading. It never renders. It holds what an agent needs to edit the slide well and what the presenter wants to say: the talking points, the point the slide must land, sources and provenance, and decision IDs. Write it before the slide body; it is how agents keep slide copy sparse without losing context.
+- **`#speaker-note[..]`** is what the presenter sees in Pympress. Keep it to 2–4 short bullets or lines drawn from the script. A note longer than about half a page is silently clipped (§ 4), so never paste the script into it.
 
 ## 6. Verification
 
@@ -236,17 +214,19 @@ Export a finished deck with one command. It writes `<stem>.pdf` (animated), `<st
 ```sh
 python3 operations/scripts/export_deck.py "path/to/deck.typ"
 pympress "resources/presentations/exports/<stem> — Pympress.pdf"   # present with notes
+python3 operations/scripts/export_deck.py "path/to/deck.typ" --png   # + 300-ppi PNGs only
+python3 operations/scripts/export_deck.py "path/to/deck.typ" --keynote   # + <stem>.key with looping clips and notes (§ 4b)
 ```
 
-Before delivery, also confirm the § 2b spine: acknowledgements are slide 2, the hypothesis map lands within the first ~20%, every section opens with a recall, and no method slide shows the short title in its footer where a hypothesis tag belongs.
+Before delivery of an external talk, also confirm the § 2b spine: acknowledgements are slide 2, the hypothesis map lands within the first ~20%, every section opens with a recall, and no method slide shows the short title in its footer where a hypothesis tag belongs.
 
 Treat any warning or error as a failed verification. A deck with a failing token, an undeclared sub-3:1 categorical mark, or a § 3a anti-pattern does not ship. Where an accent border or a hardcoded value genuinely encodes an empirical condition, declare it with a `// lint-ok: <what it encodes>` comment rather than relaxing the rule. After any change to `deck-kit.typ` or `deck-figures.typ`, compile `operations/templates/Touying Gallery.typ` and every template, then render the gallery and inspect it. A clean compile only proves the shared layer still builds; it says nothing about layout.
 
 **What each check covers.**
 
-- **`check_decks.py`** is the compile gate. Session closeout runs it on every deck affected by the session's changes (the deck itself, or a kit, palette, figure-helper, or asset file it imports or reads), in default, handout, Pympress, and dark modes. `python3 operations/scripts/check_decks.py` sweeps every deck explicitly.
-- **`typst compile` / `export_deck.py` / `check_decks.py`** catch syntax and code errors and compiler warnings. They do not catch overflow (§ 4): extra pages, right-edge clipping, and clipped speaker notes all compile cleanly.
-- **`contrast_lint.py`** parses the live `theme-colors.typ` and fails a token below its tier floor, a categorical mark below 3:1 on the light canvas that `cat-needs-outline-on-light` does not declare, a declaration naming no `cat` mark, or a mark below 3:1 on the dark canvas. It audits the palette file only. It cannot see whether a deck actually draws the 0.75pt outline on a declared mark, or how legible a colour is on a surface other than its canvas (for example, text on a `container` fill).
+- **`check_decks.py`** is the compile gate. Session closeout runs it, in default, handout, Pympress, and dark modes, on every deck the session's changes affect directly or through an imported kit, palette, figure, or asset file. `python3 operations/scripts/check_decks.py` sweeps every deck explicitly.
+- **`typst compile` / `export_deck.py` / `check_decks.py`** catch code errors and compiler warnings, never overflow (§ 4).
+- **`contrast_lint.py`** audits the palette file only: token tier floors and categorical-mark contrast on both canvases (full list in [references/typst-touying-reference.md](references/typst-touying-reference.md) § Colour tokens). It cannot see whether a deck draws the outline on a declared mark, or text legibility on a `container` fill.
 - **`slide_lint.py`** catches the § 3a source anti-patterns and hardcoded hex in decks. It does not check layout, word budgets, or the § 2b spine.
 
 **Rendered inspection is required for every finished deck**, because no automated check sees it:
