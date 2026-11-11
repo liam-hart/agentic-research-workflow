@@ -26,7 +26,7 @@ Produce a stated delegation split before the first edit, then spawn the subagent
 ## Boundaries
 
 - Judgment stays with the lead: architecture, scientific interpretation, task and priority routing, policy conflicts, and final status claims.
-- Standing authorization covers in-session subagents only. Forks, Agent View, Agent Teams, dynamic workflows, cross-session messages, and worktrees keep their own gates.
+- Standing authorization covers in-session subagents, forked subagents included. A forked subagent inherits the conversation but not its approvals. New-session forks (`/fork`), Agent View, Agent Teams, dynamic workflows, cross-session messages, and worktrees keep their own gates.
 - Subagents never self-certify, commit, push, publish, or export.
 - Skip this skill for single-slice work. An unnecessary split costs more than it saves.
 
