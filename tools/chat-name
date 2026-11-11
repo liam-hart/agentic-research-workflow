@@ -1,0 +1,14 @@
+#!/bin/sh
+# chat-name "short name"  -> set this chat's one-line name (shown on the status line and in .bench-lock)
+# chat-name --get         -> print it
+# chat-name --clear       -> remove it
+# Stored beside the other per-session files, so a status-line script can read it.
+sid="${CLAUDE_CODE_SESSION_ID:-}"
+[ -n "$sid" ] || { echo "chat-name: CLAUDE_CODE_SESSION_ID not set" >&2; exit 2; }
+f="${TMPDIR:-/tmp}/ghostty-pane-$sid.name"
+case "${1:-}" in
+  --get)   cat "$f" 2>/dev/null ;;
+  --clear) rm -f "$f" ;;
+  "")      echo "usage: chat-name \"short name\" | --get | --clear" >&2; exit 2 ;;
+  *)       printf '%s' "$*" | tr '\n' ' ' | cut -c1-40 > "$f" ;;
+esac
