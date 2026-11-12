@@ -9,3 +9,4 @@ How the method is applied to particular kinds of work. Each playbook links back 
 | Slides in Typst | Planned |
 | A Unity or VR experiment | Planned |
 | Analysis code | Planned |
+| [Shared bench lock](shared-bench-lock.md) | Written |
