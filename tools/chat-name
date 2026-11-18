@@ -1,14 +1,85 @@
 #!/bin/sh
-# chat-name "short name"  -> set this chat's one-line name (shown on the status line and in .bench-lock)
-# chat-name --get         -> print it
-# chat-name --clear       -> remove it
-# Stored beside the other per-session files, so a status-line script can read it.
-sid="${CLAUDE_CODE_SESSION_ID:-}"
-[ -n "$sid" ] || { echo "chat-name: CLAUDE_CODE_SESSION_ID not set" >&2; exit 2; }
+# chat-name [--session ID] "short name"  -> set this session's one-line name (shown on status line and in .bench-lock)
+# chat-name [--session ID] --get         -> print it
+# chat-name [--session ID] --clear       -> remove it
+# Resolves session identity from --session, CLAUDE_CODE_SESSION_ID, AGY_CONVERSATION_ID,
+# ANTIGRAVITY_CONVERSATION_ID, CODEX_THREAD_ID, or CURSOR_SESSION_ID.
+explicit_sid=""
+action=""
+name_parts=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --session)
+      [ $# -ge 2 ] && [ -n "${2:-}" ] || { echo "chat-name: --session requires an id" >&2; exit 2; }
+      explicit_sid="$2"
+      shift 2
+      ;;
+    --session=*)
+      explicit_sid="${1#--session=}"
+      [ -n "$explicit_sid" ] || { echo "chat-name: --session requires an id" >&2; exit 2; }
+      shift
+      ;;
+    --get|--clear)
+      if [ -z "$action" ] && [ -z "$name_parts" ]; then
+        action="$1"
+      else
+        name_parts="${name_parts:+$name_parts }$1"
+      fi
+      shift
+      ;;
+    --)
+      shift
+      while [ $# -gt 0 ]; do
+        name_parts="${name_parts:+$name_parts }$1"
+        shift
+      done
+      ;;
+    *)
+      name_parts="${name_parts:+$name_parts }$1"
+      shift
+      ;;
+  esac
+done
+
+if [ -n "$explicit_sid" ]; then
+  sid="$explicit_sid"
+elif [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  sid="$CLAUDE_CODE_SESSION_ID"
+elif [ -n "${AGY_CONVERSATION_ID:-}" ]; then
+  sid="$AGY_CONVERSATION_ID"
+elif [ -n "${ANTIGRAVITY_CONVERSATION_ID:-}" ]; then
+  sid="$ANTIGRAVITY_CONVERSATION_ID"
+elif [ -n "${CODEX_THREAD_ID:-}" ]; then
+  sid="$CODEX_THREAD_ID"
+elif [ -n "${CURSOR_SESSION_ID:-}" ]; then
+  sid="$CURSOR_SESSION_ID"
+else
+  echo "chat-name: no session id set (expected CLAUDE_CODE_SESSION_ID, AGY_CONVERSATION_ID, ANTIGRAVITY_CONVERSATION_ID, CODEX_THREAD_ID, CURSOR_SESSION_ID, or --session <id>)" >&2
+  exit 2
+fi
+
+# Strip optional harness prefix (e.g. agy:abc -> abc) and reject path separators or newlines.
+case "$sid" in
+  claude:*|agy:*|codex:*|cursor:*|session:*) sid="${sid#*:}" ;;
+esac
+case "$sid" in
+  ""|*/*|*".."*) echo "chat-name: invalid session id" >&2; exit 2 ;;
+esac
+case "$sid" in
+  *"
+"*|*"$(printf '\r')"*) echo "chat-name: invalid session id" >&2; exit 2 ;;
+esac
+
 f="${TMPDIR:-/tmp}/ghostty-pane-$sid.name"
-case "${1:-}" in
+case "$action" in
   --get)   cat "$f" 2>/dev/null ;;
   --clear) rm -f "$f" ;;
-  "")      echo "usage: chat-name \"short name\" | --get | --clear" >&2; exit 2 ;;
-  *)       printf '%s' "$*" | tr '\n' ' ' | cut -c1-40 > "$f" ;;
+  *)
+    if [ -z "$name_parts" ]; then
+      echo "usage: chat-name [--session <id>] \"short name\" | --get | --clear" >&2
+      exit 2
+    fi
+    printf '%s' "$name_parts" | tr '\r\n' '  ' | cut -c1-40 > "$f"
+    ;;
 esac

@@ -2,113 +2,300 @@
 """bench-lock take|release|status|wait for a lock on a shared checkout that one live application
 (for example a game-engine editor) holds, so only one agent session at a time switches branches or edits there.
 
-  bench-lock take --purpose "..." [--branch B] [--owner O]   take the lock atomically (exit 1 if another chat holds it)
-  bench-lock wait --purpose "..." [--timeout S] [--poll S]   block until the bench is free, then take it
-                                                             (run with run_in_background: the exit is the notification)
-  bench-lock release [--force]                               delete the lock if this chat holds it; prints return_to
-  bench-lock status                                          free / mine / held by another (exit 1)
+  bench-lock [--session ID] take --purpose "..." [--branch B] [--owner O]   take the lock atomically (exit 1 if another chat holds it)
+  bench-lock [--session ID] wait --purpose "..." [--timeout S] [--poll S]   block until the bench is free, then take it
+                                                                            (run with run_in_background: the exit is the notification)
+  bench-lock [--session ID] release [--force]                               delete the lock if this chat holds it; prints return_to
+  bench-lock [--session ID] status                                          free / mine / held by another (exit 1)
 
-Identity is $CLAUDE_CODE_SESSION_ID plus `chat-name --get`. The lock lives at the bench root (main worktree),
-found through the shared .git, so it works from any worktree. Never runs unity, git checkout, or git switch."""
-import argparse, os, subprocess, sys, time
+Identity resolves from --session <id>, $CLAUDE_CODE_SESSION_ID (claude:...), $AGY_CONVERSATION_ID /
+$ANTIGRAVITY_CONVERSATION_ID (agy:...), $CODEX_THREAD_ID (codex:...), or $CURSOR_SESSION_ID (cursor:...),
+plus `chat-name --get`. The lock lives at the bench root (main worktree), found through the shared .git,
+so it works from any worktree. Never runs unity, git checkout, or git switch."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+import tempfile
+import time
 from datetime import datetime, timezone
 
-def git(*a, cwd=None):
+SPECIFIC_HARNESSES = ("claude", "agy", "codex", "cursor")
+KNOWN_PREFIXES = (*SPECIFIC_HARNESSES, "session")
+ENV_HARNESS_VARS = (
+    ("CLAUDE_CODE_SESSION_ID", "claude"),
+    ("AGY_CONVERSATION_ID", "agy"),
+    ("ANTIGRAVITY_CONVERSATION_ID", "agy"),
+    ("CODEX_THREAD_ID", "codex"),
+    ("CURSOR_SESSION_ID", "cursor"),
+)
+
+ROOT = ""
+LOCK = ""
+
+
+def _one_line(value: str) -> str:
+    return " ".join(value.replace("\r", " ").replace("\n", " ").split())
+
+
+def git(*a: str, cwd: str | None = None) -> str:
     r = subprocess.run(["git", *a], cwd=cwd, capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
 
-def bench_root():
+
+def bench_root() -> str:
     common = git("rev-parse", "--path-format=absolute", "--git-common-dir")
     if not common.endswith("/.git"):
         sys.exit("bench-lock: run inside the repository or one of its worktrees")
     return common[:-5]
 
-ROOT = bench_root()
-LOCK = os.path.join(ROOT, ".bench-lock")
-SID = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
 
-def chat_name():
-    r = subprocess.run(["chat-name", "--get"], capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else ""
+def resolve_session(explicit: str | None = None) -> tuple[str, str]:
+    raw = (explicit or "").strip()
+    harness = ""
+    if raw:
+        head, sep, tail = raw.partition(":")
+        if sep and head.lower() in KNOWN_PREFIXES and tail.strip():
+            harness, sid = head.lower(), tail.strip()
+        else:
+            harness, sid = "session", raw
+    else:
+        sid = ""
+        for env_key, prefix in ENV_HARNESS_VARS:
+            val = os.environ.get(env_key, "").strip()
+            if val:
+                head, sep, tail = val.partition(":")
+                if sep and head.lower() in KNOWN_PREFIXES and tail.strip():
+                    harness, sid = head.lower(), tail.strip()
+                else:
+                    harness, sid = prefix, val
+                break
+    if sid and ("/" in sid or ".." in sid or "\n" in sid or "\r" in sid):
+        sys.exit("bench-lock: invalid session id")
+    return harness, sid
 
-def read():
+
+def require_session(harness: str, sid: str) -> tuple[str, str]:
+    if not sid:
+        sys.exit(
+            "bench-lock: no session id set (expected CLAUDE_CODE_SESSION_ID, "
+            "AGY_CONVERSATION_ID, ANTIGRAVITY_CONVERSATION_ID, CODEX_THREAD_ID, "
+            "CURSOR_SESSION_ID, or --session <id>)"
+        )
+    if len(sid) < 8:
+        sys.exit("bench-lock: session id must be at least 8 characters")
+    return harness, sid
+
+
+def chat_name(sid: str) -> str:
+    if not sid:
+        return ""
+    r = subprocess.run(
+        ["chat-name", "--session", sid, "--get"], capture_output=True, text=True
+    )
+    return _one_line(r.stdout) if r.returncode == 0 else ""
+
+
+def read() -> tuple[dict[str, str], str] | None:
     try:
-        text = open(LOCK).read()
+        with open(LOCK, encoding="utf-8") as fh:
+            text = fh.read()
     except FileNotFoundError:
         return None
-    f = {}
+    f: dict[str, str] = {}
     for line in text.splitlines():
-        k, _, v = line.partition(":")
-        if v: f[k.strip().lower()] = v.strip()
+        k, sep, v = line.partition(":")
+        if sep:
+            key = k.strip().lower()
+            if key and key not in f:
+                f[key] = v.strip()
     return f, text
 
-def mine(f):
-    s = f.get("session", "").lower()
-    return bool(s) and len(s) >= 8 and SID.lower().startswith(s)
 
-def take(a):
-    if not SID: sys.exit("bench-lock: CLAUDE_CODE_SESSION_ID not set")
-    name = chat_name()
-    if not name and not getattr(take, "warned", False):
-        take.warned = True; print("bench-lock: warning: no chat name set; run `chat-name \"...\"` so the status line can show who holds it", file=sys.stderr)
-    cur = read()
-    if cur and mine(cur[0]):
-        print("bench already yours:\n" + cur[1], end=""); return 0
-    body = (f"owner: {a.owner or 'claude session ' + SID[:8]}\nsession: {SID}\nname: {name}\n"
-            f"branch: {a.branch or git('branch', '--show-current') or '(detached)'}\npurpose: {a.purpose}\n"
-            f"acquired: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
-            f"return_to: {git('branch', '--show-current', cwd=ROOT) or '(detached)'} {git('rev-parse', '--short', 'HEAD', cwd=ROOT)}\n")
+def mine(f: dict[str, str], harness: str, sid: str) -> bool:
+    s = f.get("session", "").lower()
+    lock_harness = ""
+    if s.startswith(tuple(f"{p}:" for p in KNOWN_PREFIXES)):
+        lock_harness, _, s = s.partition(":")
+    else:
+        owner_head, sep, _ = f.get("owner", "").lower().partition(":")
+        if sep and owner_head in SPECIFIC_HARNESSES:
+            lock_harness = owner_head
+    if not s or not sid or len(s) < 8 or sid.lower() != s:
+        return False
+    if (
+        lock_harness in SPECIFIC_HARNESSES
+        and harness in SPECIFIC_HARNESSES
+        and lock_harness != harness
+    ):
+        return False
+    return True
+
+
+def _write_lock_atomic(body: str) -> bool:
+    """Create `.bench-lock` atomically with full contents (never exposing a 0-byte file)."""
+    fd, tmp_path = tempfile.mkstemp(dir=ROOT, prefix=".bench-lock.tmp.")
     try:
-        fd = os.open(LOCK, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)  # atomic check-and-write
-    except FileExistsError:
+        os.chmod(tmp_path, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(body)
+            fh.flush()
+            os.fsync(fh.fileno())
+        try:
+            os.link(tmp_path, LOCK)
+        except FileExistsError:
+            return False
+        return True
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+def take(a: argparse.Namespace, harness: str, sid: str) -> int:
+    harness, sid = require_session(harness, sid)
+    name = chat_name(sid)
+    if not name and not getattr(take, "warned", False):
+        take.warned = True
+        print(
+            'bench-lock: warning: no chat name set; run `chat-name "..."` so the status line can show who holds it',
+            file=sys.stderr,
+        )
+    cur = read()
+    if cur and mine(cur[0], harness, sid):
+        print("bench already yours:\n" + cur[1], end="")
+        return 0
+    default_owner = f"{harness}:{sid[:8]}"
+    owner_val = _one_line(a.owner) if a.owner else default_owner
+    branch_val = _one_line(a.branch or git("branch", "--show-current") or "(detached)")
+    purpose_val = _one_line(a.purpose)
+    ret_branch = _one_line(git("branch", "--show-current", cwd=ROOT) or "(detached)")
+    ret_sha = _one_line(git("rev-parse", "--short", "HEAD", cwd=ROOT))
+    body = (
+        f"owner: {owner_val}\n"
+        f"session: {sid}\n"
+        f"name: {name}\n"
+        f"branch: {branch_val}\n"
+        f"purpose: {purpose_val}\n"
+        f"acquired: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
+        f"return_to: {ret_branch} {ret_sha}\n"
+    )
+    if not _write_lock_atomic(body):
         return 1
-    with os.fdopen(fd, "w") as fh: fh.write(body)
     print("bench taken:\n" + body, end="")
-    dirty = "\n".join(l for l in git("status", "--short", cwd=ROOT).splitlines() if not l.endswith(".bench-lock"))
-    if dirty: print("note: bench tree is not clean:\n" + dirty)
+    dirty = "\n".join(
+        ln
+        for ln in git("status", "--short", cwd=ROOT).splitlines()
+        if not ln.endswith(".bench-lock") and ".bench-lock.tmp." not in ln
+    )
+    if dirty:
+        print("note: bench tree is not clean:\n" + dirty)
     return 0
 
-def release(a):
+
+def release(a: argparse.Namespace, harness: str, sid: str) -> int:
+    if not a.force:
+        harness, sid = require_session(harness, sid)
     cur = read()
-    if not cur: print("bench already free"); return 0
-    f, text = cur
-    if not mine(f) and not a.force:
-        print("bench-lock: not your lock; held by " + (f.get("name") or f.get("owner", "?")) + ". Use --force only if the bench owner says it is abandoned.", file=sys.stderr)
+    if not cur:
+        print("bench already free")
+        return 0
+    f, _ = cur
+    if not mine(f, harness, sid) and not a.force:
+        holder = f.get("name") or f.get("owner", "?")
+        print(
+            f"bench-lock: not your lock; held by {holder}. Use --force only if the bench owner says it is abandoned.",
+            file=sys.stderr,
+        )
         return 1
     os.remove(LOCK)
-    print("released. Return the bench to: " + f.get("return_to", "(unknown; read git reflog)"))
-    print("Check `git status --short` and `git reflog -3` before any checkout; this command did not switch branches.")
+    print(
+        "released. Return the bench to: "
+        + f.get("return_to", "(unknown; read git reflog)")
+    )
+    print(
+        "Check `git status --short` and `git reflog -3` before any checkout; this command did not switch branches."
+    )
     return 0
 
-def status(a):
-    cur = read()
-    if not cur: print("free"); return 0
-    f, text = cur
-    print(("yours" if mine(f) else "held by another chat") + ":\n" + text, end="")
-    return 0 if mine(f) else 1
 
-def wait(a):
-    end = time.time() + a.timeout if a.timeout else None
+def status(a: argparse.Namespace, harness: str, sid: str) -> int:
+    cur = read()
+    if not cur:
+        print("free")
+        return 0
+    f, text = cur
+    is_mine = mine(f, harness, sid)
+    print(("yours" if is_mine else "held by another chat") + ":\n" + text, end="")
+    return 0 if is_mine else 1
+
+
+def wait(a: argparse.Namespace, harness: str, sid: str) -> int:
+    require_session(harness, sid)
+    if a.poll <= 0:
+        sys.exit("bench-lock: --poll must be >= 1")
+    end = time.time() + a.timeout if a.timeout and a.timeout > 0 else None
     last = None
     while True:
-        rc = take(a)
-        if rc == 0: return 0
+        rc = take(a, harness, sid)
+        if rc == 0:
+            return 0
         cur = read()
         who = (cur[0].get("name") or cur[0].get("owner", "?")) if cur else "?"
-        if who != last: print(f"waiting: bench held by {who}", flush=True); last = who
-        if end and time.time() > end:
-            print("bench-lock: timed out waiting", file=sys.stderr); return 3
-        time.sleep(a.poll)
+        if who != last:
+            print(f"waiting: bench held by {who}", flush=True)
+            last = who
+        now = time.time()
+        if end is not None and now >= end:
+            print("bench-lock: timed out waiting", file=sys.stderr)
+            return 3
+        sleep_sec = a.poll if end is None else min(float(a.poll), max(0.05, end - now))
+        time.sleep(sleep_sec)
 
-p = argparse.ArgumentParser(prog="bench-lock")
-sub = p.add_subparsers(dest="cmd", required=True)
-for n in ("take", "wait"):
-    s = sub.add_parser(n); s.add_argument("--purpose", required=True); s.add_argument("--branch"); s.add_argument("--owner")
-    if n == "wait": s.add_argument("--timeout", type=int, default=0); s.add_argument("--poll", type=int, default=10)
-sub.add_parser("release").add_argument("--force", action="store_true")
-sub.add_parser("status")
-a = p.parse_args()
-rc = {"take": take, "wait": wait, "release": release, "status": status}[a.cmd](a)
-if rc == 1 and a.cmd in ("take", "wait"):
-    print("bench taken by another chat:\n" + (read() or ("", ""))[1], end="")
-sys.exit(rc)
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="bench-lock")
+    p.add_argument(
+        "--session",
+        dest="top_session",
+        help="Explicit session identifier (overrides environment session variables)",
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
+    for n in ("take", "wait"):
+        s = sub.add_parser(n)
+        s.add_argument("--session", dest="sub_session", help=argparse.SUPPRESS)
+        s.add_argument("--purpose", required=True)
+        s.add_argument("--branch")
+        s.add_argument("--owner")
+        if n == "wait":
+            s.add_argument("--timeout", type=int, default=0)
+            s.add_argument("--poll", type=int, default=10)
+    rel = sub.add_parser("release")
+    rel.add_argument("--session", dest="sub_session", help=argparse.SUPPRESS)
+    rel.add_argument("--force", action="store_true")
+    st = sub.add_parser("status")
+    st.add_argument("--session", dest="sub_session", help=argparse.SUPPRESS)
+    return p
+
+
+def main() -> int:
+    global ROOT, LOCK
+    a = build_parser().parse_args()
+    ROOT = bench_root()
+    LOCK = os.path.join(ROOT, ".bench-lock")
+    explicit = getattr(a, "sub_session", None) or getattr(a, "top_session", None)
+    harness, sid = resolve_session(explicit)
+    rc = {"take": take, "wait": wait, "release": release, "status": status}[a.cmd](
+        a, harness, sid
+    )
+    if rc == 1 and a.cmd in ("take", "wait"):
+        print("bench taken by another chat:\n" + (read() or ({}, ""))[1], end="")
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

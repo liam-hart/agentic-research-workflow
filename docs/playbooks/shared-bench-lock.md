@@ -13,22 +13,28 @@ Call that checkout the bench. Work that does not need the live application happe
 
 ## The tools
 
-Both tools live in `tools/`. Both need `CLAUDE_CODE_SESSION_ID`. Claude Code sets it. Another harness must export its own stable session id under that name.
+Both tools live in `tools/` and resolve the current session identity in this order:
+
+1. Explicit `--session <id>` (for example `--session agy:<uuid>` or `--session <id>`)
+2. `CLAUDE_CODE_SESSION_ID` (Claude Code; default owner `claude:<id[:8]>`)
+3. `AGY_CONVERSATION_ID` or `ANTIGRAVITY_CONVERSATION_ID` (Antigravity CLI; default owner `agy:<id[:8]>`)
+4. `CODEX_THREAD_ID` (Codex CLI; default owner `codex:<id[:8]>`)
+5. `CURSOR_SESSION_ID` (Cursor Agent; default owner `cursor:<id[:8]>`)
 
 `bench-lock` has four commands:
 
 | Command | What it does |
 |---|---|
-| `bench-lock take --purpose "..."` | Takes the lock in one atomic step. Exits 1 if another session holds it. Also takes `--branch` and `--owner`. |
-| `bench-lock wait --purpose "..." [--timeout S] [--poll S]` | Waits until the bench is free, then takes it. Exits 3 on timeout. Run it in the background; its exit is the signal. |
-| `bench-lock release [--force]` | Deletes the lock if this session holds it, and prints where to return the bench to. `--force` is only for a lock the bench owner says is abandoned. |
-| `bench-lock status` | Prints `free`, `yours`, or `held by another chat` (exit 1). |
+| `bench-lock [--session ID] take --purpose "..."` | Takes the lock in one atomic step (`O_CREAT \| O_EXCL`). Exits 1 if another session holds it. Also takes `--branch` and `--owner`. |
+| `bench-lock [--session ID] wait --purpose "..." [--timeout S] [--poll S]` | Waits until the bench is free, then takes it. Exits 3 on timeout. Run it in the background; its exit is the signal. |
+| `bench-lock [--session ID] release [--force]` | Deletes the lock if this session holds it, and prints where to return the bench to. `--force` is only for a lock the bench owner says is abandoned. |
+| `bench-lock [--session ID] status` | Prints `free`, `yours`, or `held by another chat` (exit 1). Works without a session ID set when inspecting from a plain shell. |
 
 `chat-name` labels the session so the lock shows who holds it:
 
-- `chat-name "short name"` sets the name (40 characters at most).
-- `chat-name --get` prints it.
-- `chat-name --clear` removes it.
+- `chat-name [--session ID] "short name"` sets the name (40 characters at most).
+- `chat-name [--session ID] --get` prints it.
+- `chat-name [--session ID] --clear` removes it.
 
 Set a name before you take the lock. The name is stored in `${TMPDIR:-/tmp}/ghostty-pane-<session id>.name`, so a status-line script can read it.
 
